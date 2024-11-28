@@ -1,0 +1,22 @@
+[
+    {"ping": "あ","pian": "","yin": "a"},
+    {"ping": "い","pian": "","yin": "i"},
+    {"ping": "う","pian": "","yin": "u"},
+    {"ping": "え","pian": "","yin": "e"},
+    {"ping": "お","pian": "","yin": "o", "row":"-"},
+    {"ping": "か","pian": "","yin": "ka"},
+    {"ping": "き","pian": "","yin": "ki"},
+    {"ping": "く","pian": "","yin": "ku"},
+    {"ping": "け","pian": "","yin": "ke"},
+    {"ping": "こ","pian": "","yin": "ko", "row":"-"},
+    {"ping": "さ","pian": "","yin": "sa"},
+    {"ping": "し","pian": "","yin": "shi"},
+    {"ping": "す","pian": "","yin": "su"},
+    {"ping": "せ","pian": "","yin": "se"},
+    {"ping": "そ","pian": "","yin": "so", "row":"-"},
+    {"ping": "た","pian": "","yin": "ta"},
+    {"ping": "ち","pian": "","yin": "chi"},
+    {"ping": "つ","pian": "","yin": "tsu"},
+    {"ping": "て","pian": "","yin": "te"},
+    {"ping": "と","pian": "","yin": "to", "row":"-"} 
+]
