@@ -88,7 +88,7 @@ func LoadDb() error {
 func ToDb() {
 	//insert
 	if len(insert) > 0 {
-		sqlstr := fmt.Sprint("insert into `record` values")
+		sqlstr := "insert into `record` values"
 		vals := []interface{}{}
 		for _, v := range insert {
 			sqlstr += "(?,?,?),"
