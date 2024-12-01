@@ -202,8 +202,13 @@ func TestWords() {
 func PrintAll() {
 	for _, v := range poolslice {
 		fmt.Printf("%s\t", v.Ping)
-		if v.Row == "-" {
+		switch v.Row {
+		case "-":
 			println("")
+		case "1":
+			fmt.Printf(" \t")
+		case "3":
+			fmt.Printf(" \t \t \t")
 		}
 	}
 }
