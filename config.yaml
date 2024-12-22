@@ -1,0 +1,7 @@
+wordsum: 15
+wordlen: 4
+dbip: "127.0.0.1"
+dbport: "3306"
+dbuser: "root"
+dbpasswd: "chen1992"
+dbtable: "japaness"

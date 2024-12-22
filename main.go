@@ -4,13 +4,48 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/go-gorp/gorp"
 	_ "github.com/go-sql-driver/mysql"
+	"gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	Wordsum  int
+	Wordlen  int
+	Dbip     string
+	Dbport   string
+	Dbuser   string
+	Dbpasswd string
+	Dbtable  string
+}
+
+var gconf Config
+
+func initConfig() error {
+	bs, err := os.ReadFile("./config.yaml")
+	if err != nil {
+		println(err)
+		return err
+	}
+
+	err = yaml.Unmarshal(bs, &gconf)
+	if err != nil {
+		println(err)
+		return err
+	}
+
+	println("parse config success!!")
+	return nil
+}
+
+const (
+	OP_Qing = iota
+	OP_Zhuo
 )
 
 type Langrage struct {
@@ -18,6 +53,7 @@ type Langrage struct {
 	Pian string `json:"pian"`
 	Yin  string `json:"yin"`
 	Row  string `json:"row"`
+	Op   int    `json:"op"`
 }
 
 type Record struct {
@@ -26,76 +62,134 @@ type Record struct {
 	Yin   string `db:"yin"`
 }
 
-var gcount = 1
-var pool = map[int]*Langrage{}
-var poolslice []Langrage
-var dbmap *gorp.DbMap
-var insert = map[string]*Record{}
-var update = map[string]*Record{}
-var wordsnum = 15
-var wordslen = 4
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
+type Test struct {
+	dates   []*Langrage
+	qing    []*Langrage
+	zhuo    []*Langrage
+	datem   map[int]*Langrage
+	winsert map[string]*Record
+	wupdate map[string]*Record
+	dbmap   *gorp.DbMap
 }
 
-func initDbMap() error {
-	db, err := sql.Open("mysql", "root:chen1992@tcp(127.0.0.1:3306)/japaness")
-	if err != nil {
-		fmt.Printf("open db err:%v", err)
+func NewTest(db *gorp.DbMap) *Test {
+	t := Test{
+		datem:   make(map[int]*Langrage),
+		winsert: make(map[string]*Record),
+		wupdate: make(map[string]*Record),
+		dbmap:   db,
+	}
+	return &t
+}
+
+func (t *Test) loadJsons() error {
+	load := func(path string) error {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Printf("read file err:%v", err)
+			return err
+		}
+		var tmp []*Langrage
+		err = json.Unmarshal(data, &tmp)
+		if err != nil {
+			fmt.Printf("unmarshal err:%v", err)
+			return err
+		}
+		t.dates = append(t.dates, tmp...)
+		for i, v := range tmp {
+			t.datem[i] = v
+			switch v.Op {
+			case OP_Qing:
+				t.qing = append(t.qing, v)
+			case OP_Zhuo:
+				t.zhuo = append(t.zhuo, v)
+			}
+		}
+		return nil
+	}
+
+	var err error
+	if err = load("./qing.json"); err != nil {
 		return err
 	}
-	err = db.Ping()
-	if err != nil {
-		fmt.Printf("ping err:%v", err)
+	if err = load("./zhuo.json"); err != nil {
 		return err
 	}
-	dbmap = &gorp.DbMap{Db: db, Dialect: gorp.MySQLDialect{}}
 	return nil
 }
 
-func LoadJson() error {
-	data, err := ioutil.ReadFile("./pool.json")
-	if err != nil {
-		fmt.Printf("read file err:%v", err)
-		return err
+func (t *Test) printAll() {
+	f := func(pool []*Langrage) {
+		for _, v := range pool {
+			fmt.Printf("%s\t", v.Ping)
+			switch v.Row {
+			case "-":
+				println("")
+			case "1":
+				fmt.Printf(" \t")
+			case "2":
+				fmt.Printf(" \t \t")
+			case "3":
+				fmt.Printf(" \t \t \t")
+			}
+		}
 	}
-	var tmp []*Langrage
-	err = json.Unmarshal(data, &tmp)
-	if err != nil {
-		fmt.Printf("unmarshal err:%v", err)
-		return err
-	}
-	for i, v := range tmp {
-		pool[i] = v
-		poolslice = append(poolslice, *v)
-	}
-	return nil
+
+	f(t.qing)
+	f(t.zhuo)
 }
 
-func LoadDb() error {
+func (t *Test) start() {
+	for {
+		fmt.Println("[0]:PrintAll")
+		fmt.Println("[1]:Test qing")
+		fmt.Println("[2]:Test zhuo")
+		fmt.Println("[3]:Test all")
+		fmt.Println("[4]:Test Words")
+		fmt.Printf("Enter:")
+		var number int
+		fmt.Scan(&number)
+		switch number {
+		case 0:
+			t.printAll()
+		case 1:
+			t.one(OP_Qing)
+		case 2:
+			t.one(OP_Zhuo)
+		case 3:
+			t.one(-1)
+		case 4:
+			t.words()
+		default:
+			return
+		}
+		fmt.Println("############################")
+	}
+}
+
+func (t *Test) initDb() error {
 	var records []Record
-	_, err := dbmap.Select(&records, "select * from record")
+	_, err := t.dbmap.Select(&records, "select * from record")
 	if err != nil {
 		return err
 	}
 	for i, v := range records {
-		update[v.Char] = &records[i]
+		t.wupdate[v.Char] = &records[i]
 	}
 	return nil
 }
 
-func ToDb() {
+func (t *Test) toDb() {
 	//insert
-	if len(insert) > 0 {
+	if len(t.winsert) > 0 {
 		sqlstr := "insert into `record` values"
 		vals := []interface{}{}
-		for _, v := range insert {
+		for _, v := range t.winsert {
 			sqlstr += "(?,?,?),"
 			vals = append(vals, v.Char, v.Wrong, v.Yin)
 		}
 		sqlstr = sqlstr[0 : len(sqlstr)-1] //删除最后一个','
-		stmt, err := dbmap.Db.Prepare(sqlstr)
+		stmt, err := t.dbmap.Db.Prepare(sqlstr)
 		if err != nil || stmt == nil {
 			fmt.Printf("Prepare err:%v, sql:%s", err, sqlstr)
 			return
@@ -106,9 +200,9 @@ func ToDb() {
 		}
 	}
 	//update
-	for _, v := range update {
+	for _, v := range t.wupdate {
 		sql := "update `record` set `wrong`=?,`yin`=? where `chars`=?"
-		_, err := dbmap.Db.Exec(sql, v.Wrong, v.Yin, v.Char)
+		_, err := t.dbmap.Db.Exec(sql, v.Wrong, v.Yin, v.Char)
 		if err != nil {
 			fmt.Printf("update error:%v", err)
 			return
@@ -116,17 +210,37 @@ func ToDb() {
 	}
 }
 
-func addWrong(chars, yin string) {
-	info, has := update[chars]
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func initDbMap() (*gorp.DbMap, error) {
+	connstr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", gconf.Dbuser, gconf.Dbpasswd, gconf.Dbip, gconf.Dbport, gconf.Dbtable)
+	// db, err := sql.Open("mysql", "root:chen1992@tcp(127.0.0.1:3306)/japaness")
+	db, err := sql.Open("mysql", connstr)
+	if err != nil {
+		fmt.Printf("open db err:%v", err)
+		return nil, err
+	}
+	err = db.Ping()
+	if err != nil {
+		fmt.Printf("ping err:%v", err)
+		return nil, err
+	}
+	return &gorp.DbMap{Db: db, Dialect: gorp.MySQLDialect{}}, nil
+}
+
+func (t *Test) addWrong(chars, yin string) {
+	info, has := t.wupdate[chars]
 	if has {
 		info.Wrong++
 		info.Yin = yin
 	} else {
-		v, has1 := insert[chars]
+		v, has1 := t.winsert[chars]
 		if has1 {
 			v.Wrong++
 		} else {
-			insert[chars] = &Record{
+			t.winsert[chars] = &Record{
 				Char:  chars,
 				Yin:   yin,
 				Wrong: 1,
@@ -135,50 +249,49 @@ func addWrong(chars, yin string) {
 	}
 }
 
-func TestOne() {
-	slice := rand.Perm(len(pool))
-	wrong := make([]int, 0)
-	for _, k := range slice {
+func (t *Test) one(op int) {
+	var pool []*Langrage
+	switch op {
+	case OP_Qing:
+		pool = t.qing
+	case OP_Zhuo:
+		pool = t.zhuo
+	default:
+		pool = t.dates
+	}
+
+	r := rand.Perm(len(pool))
+	begin := time.Now()
+	for _, k := range r {
 		lan := pool[k]
-		count := gcount
 		fmt.Printf("[%s]:", lan.Ping)
-		for {
-			var answer string
-			fmt.Scan(&answer)
-			if answer == lan.Yin {
-				break
-			} else {
-				count--
-				if count == 0 {
-					break
-				}
-				fmt.Printf("[%s]:", lan.Ping)
-			}
-		}
-		if count == 0 {
+		var answer string
+		fmt.Scan(&answer)
+		if answer != lan.Yin {
 			fmt.Printf("  [%s]==>%s\n", lan.Ping, lan.Yin)
-			wrong = append(wrong, k)
-			addWrong(lan.Ping, lan.Yin)
+			t.addWrong(lan.Ping, lan.Yin)
 		}
 	}
+	fmt.Printf("use time:%v\n", time.Since(begin))
 }
 
-func createWords() []int {
-	slice := rand.Perm(len(pool))
-	if wordslen > len(slice) {
+func (t *Test) createWords() []int {
+	slice := rand.Perm(len(t.datem))
+	if gconf.Wordlen > len(slice) {
 		return nil
 	}
-	randlen := rand.Intn(wordslen) + 1
+	randlen := rand.Intn(gconf.Wordlen) + 1
 	return slice[:randlen]
 }
 
-func TestWords() {
-	for i := 0; i < wordsnum; i++ {
-		words := createWords()
+func (t *Test) words() {
+	begin := time.Now()
+	for i := 0; i < gconf.Wordsum; i++ {
+		words := t.createWords()
 
 		var show string
 		for _, k := range words {
-			lan := pool[k]
+			lan := t.datem[k]
 			show += lan.Ping
 		}
 		fmt.Printf("[%s]:", show)
@@ -190,57 +303,34 @@ func TestWords() {
 			continue
 		}
 		for i := 0; i < len(words); i++ {
-			lan := pool[words[i]]
+			lan := t.datem[words[i]]
 			if lan.Yin != anwser[i] {
 				fmt.Println(lan.Ping, "==>", lan.Yin)
-				addWrong(lan.Ping, lan.Yin)
+				t.addWrong(lan.Ping, lan.Yin)
 			}
 		}
 	}
-}
-
-func PrintAll() {
-	for _, v := range poolslice {
-		fmt.Printf("%s\t", v.Ping)
-		switch v.Row {
-		case "-":
-			println("")
-		case "1":
-			fmt.Printf(" \t")
-		case "3":
-			fmt.Printf(" \t \t \t")
-		}
-	}
+	fmt.Printf("use time:%v\n", time.Since(begin))
 }
 
 func main() {
-	if err := initDbMap(); err != nil {
+	if err := initConfig(); err != nil {
 		return
 	}
-	if err := LoadJson(); err != nil {
+	db, err := initDbMap()
+	if err != nil {
+		fmt.Printf("initdb err:%v\n", err)
 		return
 	}
-	if err := LoadDb(); err != nil {
+	t := NewTest(db)
+	if err := t.loadJsons(); err != nil {
+		fmt.Printf("initdb err:%v\n", err)
 		return
 	}
-	for {
-		fmt.Println("[0]:PrintAll")
-		fmt.Println("[1]:Test Single")
-		fmt.Println("[2]:Test Words")
-		fmt.Printf("Enter:")
-		var number int
-		fmt.Scan(&number)
-		switch number {
-		case 0:
-			PrintAll()
-		case 1:
-			TestOne()
-		case 2:
-			TestWords()
-		default:
-			ToDb()
-			return
-		}
-		fmt.Println("############################")
+	if err := t.initDb(); err != nil {
+		fmt.Printf("initdb err:%v\n", err)
+		return
 	}
+	t.start()
+	t.toDb()
 }

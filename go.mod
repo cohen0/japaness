@@ -5,6 +5,7 @@ go 1.22.1
 require (
 	github.com/go-gorp/gorp v2.2.0+incompatible
 	github.com/go-sql-driver/mysql v1.8.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
