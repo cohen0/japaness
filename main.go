@@ -22,6 +22,7 @@ type Config struct {
 	Dbuser   string
 	Dbpasswd string
 	Dbtable  string
+	Pian     int
 }
 
 var gconf Config
@@ -121,7 +122,7 @@ func (t *Test) loadJsons() error {
 func (t *Test) printAll() {
 	f := func(pool []*Langrage) {
 		for _, v := range pool {
-			fmt.Printf("%s\t", v.Ping)
+			fmt.Printf("[%s,%s]\t", v.Ping, v.Pian)
 			switch v.Row {
 			case "-":
 				println("")
@@ -249,6 +250,14 @@ func (t *Test) addWrong(chars, yin string) {
 	}
 }
 
+func (t *Test) getstring(lan *Langrage) string {
+	if gconf.Pian == 0 {
+		return lan.Ping
+	} else {
+		return lan.Pian
+	}
+}
+
 func (t *Test) one(op int) {
 	var pool []*Langrage
 	switch op {
@@ -264,12 +273,16 @@ func (t *Test) one(op int) {
 	begin := time.Now()
 	for _, k := range r {
 		lan := pool[k]
-		fmt.Printf("[%s]:", lan.Ping)
+		lstr := t.getstring(lan)
+		if lstr == "" {
+			continue
+		}
+		fmt.Printf("[%s]:", lstr)
 		var answer string
 		fmt.Scan(&answer)
 		if answer != lan.Yin {
-			fmt.Printf("  [%s]==>%s\n", lan.Ping, lan.Yin)
-			t.addWrong(lan.Ping, lan.Yin)
+			fmt.Printf("  [%s]==>%s\n", lstr, lan.Yin)
+			t.addWrong(lstr, lan.Yin)
 		}
 	}
 	fmt.Printf("use time:%v\n", time.Since(begin))
@@ -292,7 +305,11 @@ func (t *Test) words() {
 		var show string
 		for _, k := range words {
 			lan := t.datem[k]
-			show += lan.Ping
+			lstr := t.getstring(lan)
+			if lstr == "" {
+				continue
+			}
+			show += lstr
 		}
 		fmt.Printf("[%s]:", show)
 
@@ -305,8 +322,9 @@ func (t *Test) words() {
 		for i := 0; i < len(words); i++ {
 			lan := t.datem[words[i]]
 			if lan.Yin != anwser[i] {
-				fmt.Println(lan.Ping, "==>", lan.Yin)
-				t.addWrong(lan.Ping, lan.Yin)
+				lstr := t.getstring(lan)
+				fmt.Println(lstr, "==>", lan.Yin)
+				t.addWrong(lstr, lan.Yin)
 			}
 		}
 	}

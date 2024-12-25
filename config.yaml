@@ -5,3 +5,4 @@ dbport: "3306"
 dbuser: "root"
 dbpasswd: "chen1992"
 dbtable: "japaness"
+pian: 0

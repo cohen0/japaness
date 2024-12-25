@@ -1,6 +1,6 @@
 module japaness
 
-go 1.22.1
+go 1.22
 
 require (
 	github.com/go-gorp/gorp v2.2.0+incompatible
