@@ -22,7 +22,6 @@ type Config struct {
 	Dbuser   string
 	Dbpasswd string
 	Dbtable  string
-	Pian     int
 }
 
 var gconf Config
@@ -47,6 +46,12 @@ func initConfig() error {
 const (
 	OP_Qing = iota
 	OP_Zhuo
+	OP_All
+)
+
+const (
+	OP_Ping = iota
+	OP_Pian
 )
 
 type Langrage struct {
@@ -140,29 +145,60 @@ func (t *Test) printAll() {
 	f(t.zhuo)
 }
 
+func (t *Test) Select() bool {
+	var number int
+
+	fmt.Println("[0]:PrintAll")
+	fmt.Println("[1]:Exit")
+	fmt.Println("[3]:Test")
+	fmt.Scanln(&number)
+	if number == 0 {
+		t.printAll()
+		return false
+	} else if number == 1 {
+		return true
+	}
+
+	var pingOrpian int
+	fmt.Println("[0]:Ping")
+	fmt.Println("[1]:Pian")
+	fmt.Scanln(&number)
+	if number == 0 {
+		pingOrpian = OP_Ping
+	} else {
+		pingOrpian = OP_Pian
+	}
+
+	fmt.Println("[0]:World")
+	fmt.Println("[1]:Char")
+	fmt.Scanln(&number)
+	if number == 0 {
+		t.words(pingOrpian)
+		return false
+	}
+
+	var pool []*Langrage
+	fmt.Println("[0]:qing")
+	fmt.Println("[1]:zhuo")
+	fmt.Println("[2]:all")
+	fmt.Scanln(&number)
+	if number == 0 {
+		pool = t.qing
+	} else if number == 1 {
+		pool = t.zhuo
+	} else {
+		pool = t.dates
+	}
+
+	t.one(pingOrpian, pool)
+	return false
+}
+
 func (t *Test) start() {
 	for {
-		fmt.Println("[0]:PrintAll")
-		fmt.Println("[1]:Test qing")
-		fmt.Println("[2]:Test zhuo")
-		fmt.Println("[3]:Test all")
-		fmt.Println("[4]:Test Words")
-		fmt.Printf("Enter:")
-		var number int
-		fmt.Scan(&number)
-		switch number {
-		case 0:
-			t.printAll()
-		case 1:
-			t.one(OP_Qing)
-		case 2:
-			t.one(OP_Zhuo)
-		case 3:
-			t.one(-1)
-		case 4:
-			t.words()
-		default:
-			return
+		exit := t.Select()
+		if exit {
+			break
 		}
 		fmt.Println("############################")
 	}
@@ -250,30 +286,20 @@ func (t *Test) addWrong(chars, yin string) {
 	}
 }
 
-func (t *Test) getstring(lan *Langrage) string {
-	if gconf.Pian == 0 {
+func (t *Test) getstring(lan *Langrage, flag int) string {
+	if flag == OP_Ping {
 		return lan.Ping
 	} else {
 		return lan.Pian
 	}
 }
 
-func (t *Test) one(op int) {
-	var pool []*Langrage
-	switch op {
-	case OP_Qing:
-		pool = t.qing
-	case OP_Zhuo:
-		pool = t.zhuo
-	default:
-		pool = t.dates
-	}
-
+func (t *Test) one(pingOrpian int, pool []*Langrage) {
 	r := rand.Perm(len(pool))
 	begin := time.Now()
 	for _, k := range r {
 		lan := pool[k]
-		lstr := t.getstring(lan)
+		lstr := t.getstring(lan, pingOrpian)
 		if lstr == "" {
 			continue
 		}
@@ -297,7 +323,7 @@ func (t *Test) createWords() []int {
 	return slice[:randlen]
 }
 
-func (t *Test) words() {
+func (t *Test) words(pingOrpian int) {
 	begin := time.Now()
 	for i := 0; i < gconf.Wordsum; i++ {
 		words := t.createWords()
@@ -305,7 +331,7 @@ func (t *Test) words() {
 		var show string
 		for _, k := range words {
 			lan := t.datem[k]
-			lstr := t.getstring(lan)
+			lstr := t.getstring(lan, pingOrpian)
 			if lstr == "" {
 				continue
 			}
@@ -322,7 +348,7 @@ func (t *Test) words() {
 		for i := 0; i < len(words); i++ {
 			lan := t.datem[words[i]]
 			if lan.Yin != anwser[i] {
-				lstr := t.getstring(lan)
+				lstr := t.getstring(lan, pingOrpian)
 				fmt.Println(lstr, "==>", lan.Yin)
 				t.addWrong(lstr, lan.Yin)
 			}
@@ -340,11 +366,13 @@ func main() {
 		fmt.Printf("initdb err:%v\n", err)
 		return
 	}
+	println("init db success!!")
 	t := NewTest(db)
 	if err := t.loadJsons(); err != nil {
 		fmt.Printf("initdb err:%v\n", err)
 		return
 	}
+	println("load json success!!")
 	if err := t.initDb(); err != nil {
 		fmt.Printf("initdb err:%v\n", err)
 		return
