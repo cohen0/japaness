@@ -69,21 +69,21 @@ type Record struct {
 }
 
 type Test struct {
-	dates   []*Langrage
-	qing    []*Langrage
-	zhuo    []*Langrage
-	datem   map[int]*Langrage
-	winsert map[string]*Record
-	wupdate map[string]*Record
-	dbmap   *gorp.DbMap
+	dates       []*Langrage
+	qing        []*Langrage
+	zhuo        []*Langrage
+	datem       map[int]*Langrage
+	wrongInsert map[string]*Record
+	wrongUpdate map[string]*Record
+	dbmap       *gorp.DbMap
 }
 
 func NewTest(db *gorp.DbMap) *Test {
 	t := Test{
-		datem:   make(map[int]*Langrage),
-		winsert: make(map[string]*Record),
-		wupdate: make(map[string]*Record),
-		dbmap:   db,
+		datem:       make(map[int]*Langrage),
+		wrongInsert: make(map[string]*Record),
+		wrongUpdate: make(map[string]*Record),
+		dbmap:       db,
 	}
 	return &t
 }
@@ -211,17 +211,17 @@ func (t *Test) initDb() error {
 		return err
 	}
 	for i, v := range records {
-		t.wupdate[v.Char] = &records[i]
+		t.wrongUpdate[v.Char] = &records[i]
 	}
 	return nil
 }
 
 func (t *Test) toDb() {
 	//insert
-	if len(t.winsert) > 0 {
+	if len(t.wrongInsert) > 0 {
 		sqlstr := "insert into `record` values"
 		vals := []interface{}{}
-		for _, v := range t.winsert {
+		for _, v := range t.wrongInsert {
 			sqlstr += "(?,?,?),"
 			vals = append(vals, v.Char, v.Wrong, v.Yin)
 		}
@@ -237,7 +237,7 @@ func (t *Test) toDb() {
 		}
 	}
 	//update
-	for _, v := range t.wupdate {
+	for _, v := range t.wrongUpdate {
 		sql := "update `record` set `wrong`=?,`yin`=? where `chars`=?"
 		_, err := t.dbmap.Db.Exec(sql, v.Wrong, v.Yin, v.Char)
 		if err != nil {
@@ -268,16 +268,16 @@ func initDbMap() (*gorp.DbMap, error) {
 }
 
 func (t *Test) addWrong(chars, yin string) {
-	info, has := t.wupdate[chars]
+	info, has := t.wrongUpdate[chars]
 	if has {
 		info.Wrong++
 		info.Yin = yin
 	} else {
-		v, has1 := t.winsert[chars]
+		v, has1 := t.wrongInsert[chars]
 		if has1 {
 			v.Wrong++
 		} else {
-			t.winsert[chars] = &Record{
+			t.wrongInsert[chars] = &Record{
 				Char:  chars,
 				Yin:   yin,
 				Wrong: 1,
