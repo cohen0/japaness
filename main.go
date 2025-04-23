@@ -148,14 +148,14 @@ func (t *Test) printAll() {
 func (t *Test) Select() bool {
 	var number int
 
-	fmt.Println("[0]:PrintAll")
-	fmt.Println("[1]:Exit")
-	fmt.Println("[3]:Test")
+	fmt.Println("[0]:Test")
+	fmt.Println("[1]:PrintAll")
+	fmt.Println("[2]:Exit")
 	fmt.Scanln(&number)
-	if number == 0 {
+	if number == 1 {
 		t.printAll()
 		return false
-	} else if number == 1 {
+	} else if number == 2 {
 		return true
 	}
 
@@ -169,10 +169,10 @@ func (t *Test) Select() bool {
 		pingOrpian = OP_Pian
 	}
 
-	fmt.Println("[0]:World")
-	fmt.Println("[1]:Char")
+	fmt.Println("[0]:Char")
+	fmt.Println("[1]:World")
 	fmt.Scanln(&number)
-	if number == 0 {
+	if number == 1 {
 		t.words(pingOrpian)
 		return false
 	}
@@ -223,7 +223,7 @@ func (t *Test) toDb() {
 		vals := []interface{}{}
 		for _, v := range t.wrongInsert {
 			sqlstr += "(?,?,?),"
-			vals = append(vals, v.Char, v.Wrong, v.Yin)
+			vals = append(vals, v.Char, v.Yin, v.Wrong)
 		}
 		sqlstr = sqlstr[0 : len(sqlstr)-1] //删除最后一个','
 		stmt, err := t.dbmap.Db.Prepare(sqlstr)
@@ -253,7 +253,6 @@ func init() {
 
 func initDbMap() (*gorp.DbMap, error) {
 	connstr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", gconf.Dbuser, gconf.Dbpasswd, gconf.Dbip, gconf.Dbport, gconf.Dbtable)
-	// db, err := sql.Open("mysql", "root:chen1992@tcp(127.0.0.1:3306)/japaness")
 	db, err := sql.Open("mysql", connstr)
 	if err != nil {
 		fmt.Printf("open db err:%v", err)
